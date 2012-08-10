@@ -40,6 +40,8 @@
 
 -on_load(on_load/0).
 
+-include_lib("chef_certgen.hrl").
+
 on_load() ->
     %% FIXME: why do we need to start crypto here instead of relying
     %% on the release or user?
@@ -60,17 +62,22 @@ manual_start() ->
 manual_stop() ->
     application:stop(chef_certgen).
 
+-spec rsa_generate_keypair(non_neg_integer()) -> #rsa_key_pair{}.
 rsa_generate_keypair(KeyLen) ->
     {ok, PemPublicKey, PemPrivateKey} = rsa_generate_key_nif(KeyLen),
-    {keypair, [{public_key, PemPublicKey}, {private_key, PemPrivateKey}]}.
+    #rsa_key_pair{public_key = PemPublicKey, private_key = PemPrivateKey}.
 
-x509_make_cert([{signing_key, CaKeyPair}, {issuer_cert, CaCertPem},
-                {newcert_public_key, GeneratedKeypair},
-                Subject,
-                {serial, Serial}, {expiry, Expiry}])->
-    x509_make_cert_nif([{signing_key, CaKeyPair}, {issuer_cert, CaCertPem},
-                        {newcert_public_key, GeneratedKeypair},
-                        Subject,
+-spec x509_make_cert(#x509_input{}) -> {x509_cert, _}.
+x509_make_cert(#x509_input{
+                  signing_key = CaKeyPair,
+                  issuer_cert = CaCertPem,
+                  newcert_public_key = PublicKey,
+                  subject = Subject,
+                  serial = Serial,
+                  expiry = Expiry}) ->
+    x509_make_cert_nif([{signing_key, convert_key_pair(CaKeyPair)}, {issuer_cert, CaCertPem},
+                        {newcert_public_key, convert_single_key(PublicKey)},
+                        convert_subject(Subject),
                         {serial, Serial}, {expiry, Expiry}]).
 
 version() ->
@@ -80,6 +87,24 @@ version() ->
 %% -----------------------------------------
 %% internal functions
 %% -----------------------------------------
+convert_single_key(Public) ->
+    {keypair, [{public_key, Public}, {private_key, <<"">>}]}.
+
+convert_key_pair(#rsa_key_pair{public_key = Public, private_key = Private}) ->
+    {keypair, [{public_key, Public}, {private_key, Private}]}.
+
+convert_subject(#x509_subject{'CN' = CN,
+                              'O' = O,
+                              'OU' = OU,
+                              'C' = C,
+                              'ST' = ST,
+                              'L' = L}) ->
+    {subject, [{'CN', CN},
+               {'O', O},
+               {'OU', OU},
+               {'C', C},
+               {'ST', ST},
+               {'L', L}]}.
 
 rsa_generate_key_nif(_KeyLen) ->
     ?NIF_STUB.

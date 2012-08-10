@@ -23,10 +23,12 @@
 -module(chef_certgen_tests).
 
 -include_lib("eunit/include/eunit.hrl").
+-include_lib("chef_certgen/include/chef_certgen.hrl").
 
 generate_keypair_test() ->
-    Keypair = chef_certgen:rsa_generate_keypair(2048),
-    ?assertMatch({keypair, _}, Keypair).
+    ?assertMatch(#rsa_key_pair{public_key = <<_Pub/binary>>,
+                               private_key = <<_Priv/binary>>},
+                 chef_certgen:rsa_generate_keypair(2048)).
 
 create_x509_certificate_test() ->
     CaDir = filename:join(["..", "test"]),
@@ -34,19 +36,21 @@ create_x509_certificate_test() ->
     CaKeypairName  = filename:join(CaDir, "server_key.pem"),
     {ok, CaCertPem} = file:read_file(CaCertName),
     {ok, CaKeypairPem} = file:read_file(CaKeypairName),
-    CaKeypair = {keypair, [{public_key, list_to_binary("")}, {private_key, CaKeypairPem}]},
-    CommonName = "Bob",
-    Subject = {subject, [{'CN', CommonName},
-                         {'O', "Opscode, Inc."},
-                         {'OU', "Certificate Service"},
-                         {'C', "US"},
-                         {'ST', "Washington"}, {'L', "Seattle"}]},
-    GeneratedKeypair = chef_certgen:rsa_generate_keypair(2048),
-    ?assertMatch({keypair, _}, GeneratedKeypair),
-    TestCertResult = chef_certgen:x509_make_cert([{signing_key, CaKeypair},
-                                                  {issuer_cert, CaCertPem},
-                                                  {newcert_public_key, GeneratedKeypair},
-                                                  Subject,
-                                                  {serial, 1},
-                                                  {expiry, 10*365}]),
-    ?assertMatch({x509_cert, _}, TestCertResult).
+    CaKeyPair = #rsa_key_pair{public_key = <<"">>,
+                              private_key = CaKeypairPem},
+
+    Subject = #x509_subject{'CN' = "Bob",
+                            'O' = "Opscode, Inc.",
+                            'OU' = "Certificate Service",
+                            'C' = "US",
+                            'ST' = "Washington",
+                            'L' = "Seattle"},
+    GeneratedKeyPair = chef_certgen:rsa_generate_keypair(2048),
+    X509In = #x509_input{signing_key = CaKeyPair,
+                         issuer_cert = CaCertPem,
+                         newcert_public_key = GeneratedKeyPair#rsa_key_pair.public_key,
+                         subject = Subject,
+                         serial = 1,
+                         expiry = 10*365},
+    TestCertResult = chef_certgen:x509_make_cert(X509In),
+    ?assertMatch({x509_cert, <<_/binary>>}, TestCertResult).
