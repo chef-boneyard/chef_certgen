@@ -1,6 +1,6 @@
 REBAR=rebar
 
-all: compile test
+all: compile test dialyzer
 
 compile:
 	@$(REBAR) compile
@@ -10,5 +10,8 @@ clean:
 
 test:
 	@$(REBAR) eunit skip_deps=true
+
+dialyzer:
+	@dialyzer -Wrace_conditions -Wunderspecs -n ebin
 
 .PHONY: test doc

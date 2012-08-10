@@ -47,7 +47,18 @@ on_load() ->
     %% on the release or user?
     ok = ensure_started(crypto),
     LibName = "chef_certgen",
-    Lib = filename:join([priv_dir(), LibName]),
+    %% Normally, we would factor this out into a priv_dir/0 helper
+    %% function, but dialyzer doesn't resolve the new on_load
+    %% auto-export and issues a warning about priv_dir/0 not getting
+    %% called.
+    PrivDir = case code:priv_dir(chef_certgen) of
+        {error, bad_name} ->
+            %% we are not in OTP application context
+            filename:join([filename:dirname(code:which(?MODULE)), "..", "priv"]);
+        Path when is_list(Path) ->
+            Path
+    end,
+    Lib = filename:join([PrivDir, LibName]),
     erlang:load_nif(Lib, ?CHEF_CERTGEN_NIF_VSN).
 
 info() ->
@@ -67,7 +78,7 @@ rsa_generate_keypair(KeyLen) ->
     {ok, PemPublicKey, PemPrivateKey} = rsa_generate_key_nif(KeyLen),
     #rsa_key_pair{public_key = PemPublicKey, private_key = PemPrivateKey}.
 
--spec x509_make_cert(#x509_input{}) -> {x509_cert, _}.
+-spec x509_make_cert(#x509_input{}) -> {x509_cert, binary()}.
 x509_make_cert(#x509_input{
                   signing_key = CaKeyPair,
                   issuer_cert = CaCertPem,
@@ -121,15 +132,6 @@ ensure_started(App) ->
             ok;
         {error, {already_started, App}} ->
             ok
-    end.
-
-priv_dir() ->
-    case code:priv_dir(chef_certgen) of
-        {error, bad_name} ->
-            %% we are not in OTP application context
-            filename:join([filename:dirname(code:which(?MODULE)), "..", "priv"]);
-        Path when is_list(Path) ->
-            Path
     end.
 
 nif_stub_error(Line) ->
