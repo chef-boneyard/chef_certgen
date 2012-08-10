@@ -23,17 +23,13 @@
 
 -module(chef_certgen).
 
--export([info/0,
-         info_lib/0,
+-export([info_lib/0,
          manual_start/0,
          manual_stop/0,
          rsa_generate_keypair/1,
          version/0,
          x509_make_cert/1]).
 
--define(FUNC_LIST, [info_lib,
-                    rsa_generate_keypair,
-                    x509_make_cert]).
 -define(NIF_STUB, nif_stub_error(?LINE)).
 -define(CHEF_CERTGEN_VSN, 101).
 -define(CHEF_CERTGEN_NIF_VSN, 101).
@@ -61,9 +57,6 @@ on_load() ->
     Lib = filename:join([PrivDir, LibName]),
     erlang:load_nif(Lib, ?CHEF_CERTGEN_NIF_VSN).
 
-info() ->
-    ?FUNC_LIST.
-
 info_lib() -> ?NIF_STUB.
 
 manual_start() ->
@@ -73,11 +66,17 @@ manual_start() ->
 manual_stop() ->
     application:stop(chef_certgen).
 
+%% @doc Generate an RSA key pair with `KeyLen' bits. The return value
+%% is an `#rsa_key_pair{}' record containing the public and private
+%% keys in PEM encoded text format.
 -spec rsa_generate_keypair(non_neg_integer()) -> #rsa_key_pair{}.
 rsa_generate_keypair(KeyLen) ->
     {ok, PemPublicKey, PemPrivateKey} = rsa_generate_key_nif(KeyLen),
     #rsa_key_pair{public_key = PemPublicKey, private_key = PemPrivateKey}.
 
+%% @doc Return a signed x509 certificate containing the `PublicKey'
+%% provided in the `newcert_public_key' field of the `#x509_input{}'
+%% record.
 -spec x509_make_cert(#x509_input{}) -> {x509_cert, binary()}.
 x509_make_cert(#x509_input{
                   signing_key = CaKeyPair,
