@@ -73,6 +73,7 @@ static const EVP_MD *digest;
 
 /* NIF interface declarations */
 static int load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info);
+static int upgrade(ErlNifEnv* env, void** priv_data, void** old_priv_data, ERL_NIF_TERM load_info);
 
 static int load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
 {
@@ -89,6 +90,13 @@ static int load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
     atom_ok = enif_make_atom(env,"ok");
     atom_x509_cert = enif_make_atom(env, "x509_cert");
 
+    return 0;
+}
+
+static int upgrade(ErlNifEnv* env, void** priv_data, void** old_priv_data,
+                   ERL_NIF_TERM load_info)
+{
+    load(env, priv_data, load_info);
     return 0;
 }
 
@@ -511,4 +519,4 @@ static ERL_NIF_TERM x509_make_cert_nif(ErlNifEnv* env, int argc, const ERL_NIF_T
   return ret;
 }
 
-ERL_NIF_INIT(chef_certgen,nif_funcs,load,NULL,NULL,NULL)
+ERL_NIF_INIT(chef_certgen,nif_funcs,load,NULL,upgrade,NULL)
